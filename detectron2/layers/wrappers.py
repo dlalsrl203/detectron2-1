@@ -70,17 +70,22 @@ class _NewEmptyTensorOp(torch.autograd.Function):
 class Conv2d(torch.nn.Conv2d):
     """
     A wrapper around :class:`torch.nn.Conv2d` to support empty inputs and more features.
+    ##
+    빈 입력과 더 많은 기능을 지원하기 위한 :class:`torch.nn.Conv2d`의 래퍼.
     """
 
     def __init__(self, *args, **kwargs):
         """
         Extra keyword arguments supported in addition to those in `torch.nn.Conv2d`:
+        `torch.nn.Conv2d`에 추가로 지원되는 추가 키워드 인수:
 
         Args:
             norm (nn.Module, optional): a normalization layer
+                                        정규화 계층
             activation (callable(Tensor) -> Tensor): a callable activation function
-
+                                                    호출 가능한 활성화 함수
         It assumes that norm layer is used before activation.
+        활성화 이전에 표준 레이어가 사용되었다고 가정합니다.
         """
         norm = kwargs.pop("norm", None)
         activation = kwargs.pop("activation", None)
@@ -91,11 +96,16 @@ class Conv2d(torch.nn.Conv2d):
 
     def forward(self, x):
         # torchscript does not support SyncBatchNorm yet
+        # 토치스크립트는 아직 SyncBatchNorm을 지원하지 않습니다.
         # https://github.com/pytorch/pytorch/issues/40507
         # and we skip these codes in torchscript since:
+        # 그리고 우리는 그 이후로 토치스크립트에서 이 코드들을 건너뛰었습니다.
         # 1. currently we only support torchscript in evaluation mode
+        #    현재 평가 모드에서만 토치스크립트를 지원합니다.
         # 2. features needed by exporting module to torchscript are added in PyTorch 1.6 or
         # later version, `Conv2d` in these PyTorch versions has already supported empty inputs.
+        #    모듈을 토치스크립트로 내보내는 데 필요한 기능이 PyTorch 1.6 이상 버전에 추가되었습니다.
+        # 이 PyTorch 버전의 'Conv2d'는 이미 빈 입력을 지원했습니다.
         if not torch.jit.is_scripting():
             if x.numel() == 0 and self.training:
                 # https://github.com/pytorch/pytorch/issues/12013

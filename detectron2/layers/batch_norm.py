@@ -119,15 +119,6 @@ class FrozenBatchNorm2d(nn.Module):
 
 
 def get_norm(norm, out_channels):
-    """
-    Args:
-        norm (str or callable): either one of BN, SyncBN, FrozenBN, GN;
-            or a callable that takes a channel number and returns
-            the normalization layer as a nn.Module.
-
-    Returns:
-        nn.Module or None: the normalization layer
-    """
     if norm is None:
         return None
     if isinstance(norm, str):
@@ -148,6 +139,21 @@ def get_norm(norm, out_channels):
     return norm(out_channels)
 
 
+    """
+    Args:
+        norm (str or callable): either one of BN, SyncBN, FrozenBN, GN;
+            or a callable that takes a channel number and returns
+            the normalization layer as a nn.Module.
+        ##
+        norm (str or callable): BN, SyncBN, FrozenBN, GN 중 하나; 
+                                또는 채널 번호를 취하고 정규화 계층을 nn.Module로 반환하는 호출 가능.
+
+    Returns:
+        nn.Module or None: the normalization layer
+        ##
+        nn.Module or None: 정규화 계층
+
+    """
 class NaiveSyncBatchNorm(BatchNorm2d):
     """
     In PyTorch<=1.5, ``nn.SyncBatchNorm`` has incorrect gradient

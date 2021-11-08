@@ -37,22 +37,32 @@ _KEYPOINT_THRESHOLD = 0.05
 class ColorMode(Enum):
     """
     Enum of different color modes to use for instance visualizations.
+    ##
+    인스턴스 시각화에 사용할 다양한 색상 모드의 열거형입니다.
     """
 
     IMAGE = 0
     """
     Picks a random color for every instance and overlay segmentations with low opacity.
+    ##
+    모든 인스턴스에 대해 임의의 색상을 선택하고 불투명도가 낮은 오버레이 분할을 선택합니다.
     """
     SEGMENTATION = 1
     """
     Let instances of the same category have similar colors
     (from metadata.thing_colors), and overlay them with
     high opacity. This provides more attention on the quality of segmentation.
+    ##
+    동일한 카테고리의 인스턴스가 비슷한 색상(metadata.thing_colors에서)을 갖도록 하고 높은 불투명도로 오버레이합니다.
+     이것은 세분화의 품질에 더 많은 관심을 제공합니다.
     """
     IMAGE_BW = 2
     """
     Same as IMAGE, but convert all areas without masks to gray-scale.
     Only available for drawing per-instance mask predictions.
+    ##
+    IMAGE와 동일하지만 마스크가 없는 모든 영역을 회색조로 변환합니다.
+    인스턴스별 마스크 예측 그리기에만 사용할 수 있습니다.
     """
 
 
@@ -331,25 +341,42 @@ class VisImage:
 class Visualizer:
     """
     Visualizer that draws data about detection/segmentation on images.
+    ##
+    이미지의 감지/분할에 대한 데이터를 그리는 시각화 도우미.
 
     It contains methods like `draw_{text,box,circle,line,binary_mask,polygon}`
     that draw primitive objects to images, as well as high-level wrappers like
     `draw_{instance_predictions,sem_seg,panoptic_seg_predictions,dataset_dict}`
     that draw composite data in some pre-defined style.
+    ##
+    기본 개체를 이미지에 그리는 `draw_{text,box,circle,line,binary_mask,polygon}`과
+    같은 메서드와 합성을 그리는 `draw_{instance_predictions,sem_seg,panoptic_seg_predictions,dataset_dict}`와
+    같은 고급 래퍼가 포함되어 있습니다. 미리 정의된 스타일의 데이터.
 
     Note that the exact visualization style for the high-level wrappers are subject to change.
     Style such as color, opacity, label contents, visibility of labels, or even the visibility
     of objects themselves (e.g. when the object is too small) may change according
     to different heuristics, as long as the results still look visually reasonable.
+    ##
+    상위 수준 래퍼의 정확한 시각화 스타일은 변경될 수 있습니다.
+    색상, 불투명도, 레이블 내용, 레이블 가시성 또는 개체 자체의 가시성(예: 개체가 너무 작은 경우)과
+    같은 스타일은 결과가 시각적으로 합리적으로 보이는 한 다양한 경험적 방법에 따라 변경될 수 있습니다.
 
     To obtain a consistent style, you can implement custom drawing functions with the
     abovementioned primitive methods instead. If you need more customized visualization
     styles, you can process the data yourself following their format documented in
     tutorials (:doc:`/tutorials/models`, :doc:`/tutorials/datasets`). This class does not
     intend to satisfy everyone's preference on drawing styles.
+    ##
+    일관된 스타일을 얻으려면 위에서 언급한 기본 방법을 대신 사용하여 사용자 정의 그리기 기능을 구현할 수 있습니다.
+    더 맞춤화된 시각화 스타일이 필요한 경우 자습서(:doc:`/tutorials/models`, :doc:`/tutorials/datasets`)에 문서화된 형식에 따라 데이터를 직접 처리할 수 있습니다.
+    이 클래스는 드로잉 스타일에 대한 모든 사람의 선호도를 만족시키려는 것이 아닙니다.
 
     This visualizer focuses on high rendering quality rather than performance. It is not
     designed to be used for real-time applications.
+    ##
+    이 비주얼라이저는 성능보다는 높은 렌더링 품질에 중점을 둡니다.
+    실시간 응용 프로그램에 사용하도록 설계되지 않았습니다.
     """
 
     # TODO implement a fast, rasterized version using OpenCV
@@ -380,6 +407,7 @@ class Visualizer:
         self._instance_mode = instance_mode
         self.keypoint_threshold = _KEYPOINT_THRESHOLD
 
+    # instance를 그린다
     def draw_instance_predictions(self, predictions):
         """
         Draw instance-level prediction results on an image.
@@ -432,19 +460,26 @@ class Visualizer:
             alpha=alpha,
         )
         return self.output
-
+    
     def draw_sem_seg(self, sem_seg, area_threshold=None, alpha=0.8):
         """
         Draw semantic segmentation predictions/labels.
+        ##
+        semantic segmentation predictions/labels을 그립니다.
 
         Args:
             sem_seg (Tensor or ndarray): the segmentation of shape (H, W).
                 Each value is the integer label of the pixel.
+                모양의 분할(H, W).
+                각 값은 픽셀의 정수 레이블입니다.
             area_threshold (int): segments with less than `area_threshold` are not drawn.
+                                'area_threshold'보다 작은 세그먼트는 그려지지 않습니다.
             alpha (float): the larger it is, the more opaque the segmentations are.
+                            크기가 클수록 분할이 더 불투명해집니다.
 
         Returns:
             output (VisImage): image object with visualizations.
+                                시각화가 있는 이미지 개체.
         """
         if isinstance(sem_seg, torch.Tensor):
             sem_seg = sem_seg.numpy()

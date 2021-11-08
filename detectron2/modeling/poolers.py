@@ -94,6 +94,8 @@ class ROIPooler(nn.Module):
     """
     Region of interest feature map pooler that supports pooling from one or more
     feature maps.
+    ##
+    하나 이상의 feature 맵에서 풀링을 지원하는 관심 영역 feature 맵 풀러입니다.
     """
 
     def __init__(
@@ -130,6 +132,29 @@ class ROIPooler(nn.Module):
                 Note that the actual input feature maps given to this module may not have
                 sufficiently many levels for the input boxes. If the boxes are too large or too
                 small for the input feature maps, the closest level will be used.
+            ###
+            output_size (int, tuple[int] or list[int]): 풀링된 영역의 출력 크기(예: 14 x 14). 튜플 또는 목록이 제공되는 경우 길이는 2여야 합니다.
+            
+            scales (list[float]): 
+                입력 이미지에 상대적인 각 저수준 풀링 연산의 스케일입니다. 
+                입력 이미지에 상대적인 stride 가 있는 기능 맵의 경우 스케일은 1/s로 정의됩니다. 
+                보폭은 2의 거듭제곱이어야 합니다.
+                스케일이 여러 개인 경우 피라미드를 형성해야 합니다. 
+                즉, 계수가 1/2인 단조 감소하는 기하학적 시퀀스여야 합니다.
+            
+            sampling_ratio (int): ROIAlign 작업에 대한 `sampling_ratio` 매개변수입니다.
+            
+            pooler_type (string): 적용해야 하는 풀링 작업 유형의 이름입니다. 예를 들어, "ROIPool" 또는 "ROIAlignV2"입니다.
+            
+            canonical_box_size (int): 픽셀 단위의 표준 상자 크기(sqrt(box area)). 
+                기본값은 FPN 페이퍼에서 224픽셀로 경험적으로 정의됩니다(ImageNet 사전 훈련 기반).
+
+            canonical_level (int): 표준 크기의 상자를 배치해야 하는 기능 맵 수준 인덱스입니다. 
+                기본값은 FPN 페이퍼에서 레벨 4(보폭=16)로 정의됩니다. 즉, 224x224 크기의 상자가 보폭=16인 피쳐에 배치됩니다.
+                모든 상자의 상자 배치는 canonical_box_size의 크기에 따라 결정됩니다. 
+                예를 들어 영역이 표준 상자의 4배인 상자는 기능 수준 ``canonical_level+1``의 기능을 풀링하는 데 사용해야 합니다.
+                이 모듈에 제공된 실제 입력 기능 맵에는 입력 상자에 대한 수준이 충분하지 않을 수 있습니다. 
+                상자가 입력 기능 맵에 대해 너무 크거나 너무 작은 경우 가장 가까운 수준이 사용됩니다.
         """
         super().__init__()
 
@@ -196,6 +221,8 @@ class ROIPooler(nn.Module):
             Tensor:
                 A tensor of shape (M, C, output_size, output_size) where M is the total number of
                 boxes aggregated over all N batch images and C is the number of channels in `x`.
+                ##
+                모양의 텐서(M, C, output_size, output_size) 여기서 M은 모든 N 배치 이미지에 대해 집계된 총 상자 수이고 C는 'x'의 채널 수입니다.
         """
         num_level_assignments = len(self.level_poolers)
 

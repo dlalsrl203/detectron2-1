@@ -220,8 +220,11 @@ class GeneralizedRCNN(nn.Module):
     def preprocess_image(self, batched_inputs: List[Dict[str, torch.Tensor]]):
         """
         Normalize, pad and batch the input images.
+        ##
+        입력 이미지를 정규화, 패딩 및 배치합니다.
         """
         images = [x["image"].to(self.device) for x in batched_inputs]
+        # 정규화 : 각 차원의 데이터가 동일한 범위 내의 값을 갖도록 하는 전처리 기법
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
         images = ImageList.from_tensors(images, self.backbone.size_divisibility)
         return images

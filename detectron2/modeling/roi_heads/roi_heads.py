@@ -149,7 +149,7 @@ class ROIHeads(torch.nn.Module):
         NOTE: this interface is experimental.
 
         Args:
-            num_classes (int): number of foreground classes (i.e. background is not included)
+            num_classes (int): number of foreground classes (i.e. background is not included) # 전경 클래스의 수(즉, 배경은 포함되지 않음)
             batch_size_per_image (int): number of proposals to sample for training
             positive_fraction (float): fraction of positive (foreground) proposals
                 to sample for training.
@@ -184,6 +184,8 @@ class ROIHeads(torch.nn.Module):
         """
         Based on the matching between N proposals and M groundtruth,
         sample the proposals and set their classification labels.
+        ##
+        N개의 제안과 M개의 groundtruth의 매칭을 기반으로 제안을 샘플링하고 분류 레이블을 설정합니다.
 
         Args:
             matched_idxs (Tensor): a vector of length N, each is the best-matched
@@ -197,14 +199,20 @@ class ROIHeads(torch.nn.Module):
             Tensor: a vector of the same length, the classification label for
                 each sampled proposal. Each sample is labeled as either a category in
                 [0, num_classes) or the background (num_classes).
+            ##
+            Tensor: 샘플링된 제안의 인덱스 벡터입니다. 각각은 [0, N)에 있습니다.
+            Tensor: 동일한 길이의 벡터, 샘플링된 각 제안에 대한 분류 레이블. 
+                    각 샘플은 [0, num_classes) 또는 배경(num_classes)의 범주로 레이블이 지정됩니다.
         """
         has_gt = gt_classes.numel() > 0
         # Get the corresponding GT for each proposal
         if has_gt:
             gt_classes = gt_classes[matched_idxs]
             # Label unmatched proposals (0 label from matcher) as background (label=num_classes)
+            # 일치하지 않는 제안서(매처의 레이블 0개)를 배경으로 레이블 지정(label=num_classes)
             gt_classes[matched_labels == 0] = self.num_classes
             # Label ignore proposals (-1 label)
+            # 레이블 무시 제안(-1 레이블)
             gt_classes[matched_labels == -1] = -1
         else:
             gt_classes = torch.zeros_like(matched_idxs) + self.num_classes
@@ -227,6 +235,10 @@ class ROIHeads(torch.nn.Module):
         It returns ``self.batch_size_per_image`` random samples from proposals and groundtruth
         boxes, with a fraction of positives that is no larger than
         ``self.positive_fraction``.
+        ##
+        ROI 헤드를 교육하는 데 사용할 몇 가지 제안을 준비합니다.
+        'proposals'와 'targets' 간의 상자 일치를 수행하고 제안에 학습 레이블을 할당합니다.
+        제안서 및 groundtruth 상자에서 ``self.batch_size_per_image`` 무작위 샘플을 반환하며, 긍정 비율은 ``self.positive_fraction``보다 크지 않습니다.
 
         Args:
             See :meth:`ROIHeads.forward`
@@ -242,6 +254,13 @@ class ROIHeads(torch.nn.Module):
                   then the ground-truth box is random)
 
                 Other fields such as "gt_classes", "gt_masks", that's included in `targets`.
+            ##
+            훈련을 위해 샘플링된 제안을 포함하는 `인스턴스`의 길이 `N` 목록입니다. 각 '인스턴스'에는 다음 필드가 있습니다.
+                - proposal_boxes: 제안 상자
+                - gt_boxes: 제안이 할당된 ground-truth box
+                  (이는 제안서에 레이블 > 0이 있는 경우에만 의미가 있습니다. 레이블 = 0인 경우
+                  그러면 정답 상자는 무작위입니다)
+            `targets`에 포함된 "gt_classes", "gt_masks"와 같은 기타 필드.
         """
         # Augment proposals with ground-truth boxes.
         # In the case of learned proposals (e.g., RPN), when training starts
@@ -254,8 +273,16 @@ class ROIHeads(torch.nn.Module):
         # examples from the start of training. For RPN, this augmentation improves
         # convergence and empirically improves box AP on COCO by about 0.5
         # points (under one tested configuration).
+        '''
+        실제 상자를 사용하여 제안을 보강합니다.
+        학습된 제안(예: RPN)의 경우 학습이 시작될 때 무작위 초기화로 인해 제안의 품질이 낮습니다.
+        이러한 초기 제안 중 어느 것도 두 번째 단계 구성 요소(박스 헤드, cls 헤드, 마스크 헤드)에 대한 긍정적인 예로 사용되는 gt 개체와 충분히 겹치지 않을 수 있습니다.
+        제안 세트에 gt 상자를 추가하면 두 번째 단계 구성 요소가 교육 시작부터 몇 가지 긍정적인 예를 갖게 됩니다. 
+        RPN의 경우 이 증대는 수렴을 개선하고 COCO의 상자 AP를 약 0.5포인트(하나의 테스트된 구성에서) 향상시킵니다.
+
+        '''
         if self.proposal_append_gt:
-            proposals = add_ground_truth_to_proposals(targets, proposals)
+            proposals = add_ground_truth_to_proposals(targets, proposals) # proposals에 ground_truth(GT) 추가
 
         proposals_with_gt = []
 
@@ -265,15 +292,17 @@ class ROIHeads(torch.nn.Module):
             has_gt = len(targets_per_image) > 0
             match_quality_matrix = pairwise_iou(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
-            )
+            ) # GT 상자와 Proposals 상자의 교집합 계산
             matched_idxs, matched_labels = self.proposal_matcher(match_quality_matrix)
+            # 교집합 idx와 교집합 레이블
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
-            )
+            ) # GT 샘플 인덱스와 GT class
 
             # Set target attributes of the sampled proposals:
+            # 샘플링된 제안의 대상 속성 설정:
             proposals_per_image = proposals_per_image[sampled_idxs]
-            proposals_per_image.gt_classes = gt_classes
+            proposals_per_image.gt_classes = gt_classes # 제안된 이미지의 gt_calss 설정
 
             if has_gt:
                 sampled_targets = matched_idxs[sampled_idxs]
@@ -283,21 +312,35 @@ class ROIHeads(torch.nn.Module):
                 # like masks, keypoints, etc, will filter the proposals again,
                 # (by foreground/background, or number of keypoints in the image, etc)
                 # so we essentially index the data twice.
+                '''
+                "gt_"로 시작하고 아직 제안에 추가되지 않은 대상의 모든 속성을 색인화합니다(="gt_classes").
+                참고: 여기에서 인덱싱은 일부 계산을 낭비합니다. 
+                마스크, 키포인트 등과 같은 헤드가 제안을 다시 필터링하므로(전경/배경 또는 이미지의 키포인트 수 등으로) 기본적으로 데이터를 두 번 인덱싱합니다.
+                '''
                 for (trg_name, trg_value) in targets_per_image.get_fields().items():
                     if trg_name.startswith("gt_") and not proposals_per_image.has(trg_name):
                         proposals_per_image.set(trg_name, trg_value[sampled_targets])
             # If no GT is given in the image, we don't know what a dummy gt value can be.
             # Therefore the returned proposals won't have any gt_* fields, except for a
             # gt_classes full of background label.
-
+            '''
+            이미지에 GT가 제공되지 않으면 더미 gt 값이 무엇인지 알 수 없습니다.
+            따라서 반환된 제안서에는 배경 레이블로 가득 찬 gt_classes를 제외하고는 gt_* 필드가 없습니다.
+            '''
+            # bg = background
             num_bg_samples.append((gt_classes == self.num_classes).sum().item())
+            # fg = foreground
+            # numel() : input 텐서의 총 요소 수 반환
+            # ex : (1,2,3,4,5) = 1x2x3x4x5 = 120 120반환
             num_fg_samples.append(gt_classes.numel() - num_bg_samples[-1])
             proposals_with_gt.append(proposals_per_image)
 
         # Log the number of fg/bg samples that are selected for training ROI heads
+        # ROI 헤드 훈련을 위해 선택된 fg/bg 샘플의 수를 기록합니다.
+        # 로그 저장
         storage = get_event_storage()
-        storage.put_scalar("roi_head/num_fg_samples", np.mean(num_fg_samples))
-        storage.put_scalar("roi_head/num_bg_samples", np.mean(num_bg_samples))
+        storage.put_scalar("roi_head/num_fg_samples", np.mean(num_fg_samples)) # 평균
+        storage.put_scalar("roi_head/num_bg_samples", np.mean(num_bg_samples)) # 평균
 
         return proposals_with_gt
 
@@ -533,10 +576,17 @@ class StandardROIHeads(ROIHeads):
     or feature sharing between tasks.
     Each head independently processes the input features by each head's
     own pooler and head.
+    ##
+    ROI 변환 공유 또는 작업 간 feature 공유가 없다는 의미에서 "표준"입니다.
+    각 헤드는 각 헤드의 자체 풀러 및 헤드에 의해 입력 feature을 독립적으로 처리합니다.
 
     This class is used by most models, such as FPN and C5.
     To implement more models, you can subclass it and implement a different
     :meth:`forward()` or a head.
+    ##
+    이 클래스는 FPN 및 C5와 같은 대부분의 모델에서 사용됩니다.
+    더 많은 모델을 구현하려면 그것을 서브클래스화하고 다른 : meth : 'forward()' 또는 헤드를 구현할 수 있습니다.
+
     """
 
     @configurable
@@ -558,6 +608,8 @@ class StandardROIHeads(ROIHeads):
     ):
         """
         NOTE: this interface is experimental.
+        ##
+        이 인터페이스는 실험적입니다.
 
         Args:
             box_in_features (list[str]): list of feature names to use for the box head.
@@ -575,6 +627,20 @@ class StandardROIHeads(ROIHeads):
             keypoint_in_features, keypoint_pooler, keypoint_head: similar to ``mask_*``.
             train_on_pred_boxes (bool): whether to use proposal boxes or
                 predicted boxes from the box head to train other heads.
+            ##
+            box_in_features (list[str]): 박스 헤드에 사용할 feature 이름 목록입니다.
+            box_pooler (ROIPooler): 박스 헤드에 대한 추가 영역 feature에 대한 풀러
+            box_head (nn.Module): 상자 예측을 위해 feature 변환
+            box_predictor (nn.Module): feature에서 상자 예측을 수행합니다.
+                                    :class:`FastRCNNOutputLayers`와 동일한 인터페이스를 가져야 합니다.
+            mask_in_features (list[str]): 마스크 풀러 또는 마스크 헤드에 사용할 feature 이름 목록입니다. 
+                                        마스크 헤드를 사용하지 않는 경우 없음.
+            mask_pooler (ROIPooler): 이미지 특징에서 영역 특징을 추출하는 풀러.
+                                    그런 다음 마스크 헤드는 예측을 위해 영역 feature을 사용합니다.
+                                    None이면 마스크 헤드는 `mask_in_features`에 의해 정의된 이미지 feature의 딕셔너리를 직접 사용합니다.
+            mask_head (nn.Module): 마스크 예측을 위한 변환 feature keypoint_in_features, keypoint_pooler,
+                                    keypoint_head: ``mask_*``와 유사합니다.
+            train_on_pred_boxes (bool): 다른 헤드를 훈련하기 위해 상자 헤드의 제안 상자 또는 예측 상자를 사용할지 여부.
         """
         super().__init__(**kwargs)
         # keep self.in_features for backward compatibility
@@ -606,6 +672,13 @@ class StandardROIHeads(ROIHeads):
         # will not be classmethods and we need to avoid trying to call them here.
         # We test for this with ismethod which only returns True for bound methods of cls.
         # Such subclasses will need to handle calling their overridden _init_*_head methods.
+        '''
+        from_config 스타일 구성을 사용하도록 업데이트되지 않은 하위 클래스는 _init_*_head 메서드를 재정의했을 수 있습니다. 
+        이 경우 재정의된 메서드는 클래스 메서드가 아니므로 여기에서 메서드를 호출하는 것을 피해야 합니다. 
+        cls의 바인딩된 메서드에 대해서만 True를 반환하는 ismethod로 이를 테스트합니다. 
+        이러한 하위 클래스는 재정의된 _init_*_head 메서드 호출을 처리해야 합니다.
+        '''
+        # inspect.ismethod : 객체가 파이썬으로 작성된 연결된(bound) 메서드면 True를 반환합니다.
         if inspect.ismethod(cls._init_box_head):
             ret.update(cls._init_box_head(cfg, input_shape))
         if inspect.ismethod(cls._init_mask_head):
@@ -618,16 +691,23 @@ class StandardROIHeads(ROIHeads):
     def _init_box_head(cls, cfg, input_shape):
         # fmt: off
         in_features       = cfg.MODEL.ROI_HEADS.IN_FEATURES
-        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION # pooler 해상도
         pooler_scales     = tuple(1.0 / input_shape[k].stride for k in in_features)
+         # 이 scales은 backbone의 stride로 인한 축소 scales을 나타냅니다. BTW, 이 설명을 더 잘 이해하려면 ResNet 및 ResNeXt 아키텍처를 잘 이해해야 합니다.
         sampling_ratio    = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
         pooler_type       = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
         # fmt: on
 
         # If StandardROIHeads is applied on multiple feature maps (as in FPN),
         # then we share the same predictors and therefore the channel counts must be the same
+        '''
+        StandardROIHeads가 여러 기능 맵에 적용되는 경우(FPN에서와 같이) 동일한 예측 변수를 공유하므로 채널 수가 동일해야 합니다.
+        '''
         in_channels = [input_shape[f].channels for f in in_features]
         # Check all channel counts are equal
+        '''
+        모든 채널 수가 동일한지 확인
+        '''
         assert len(set(in_channels)) == 1, in_channels
         in_channels = in_channels[0]
 
@@ -640,6 +720,11 @@ class StandardROIHeads(ROIHeads):
         # Here we split "box head" and "box predictor", which is mainly due to historical reasons.
         # They are used together so the "box predictor" layers should be part of the "box head".
         # New subclasses of ROIHeads do not need "box predictor"s.
+        '''
+        여기서는 주로 historical한 이유로 인해 "박스 헤드"와 "박스 예측기"를 분할합니다.
+        "상자 예측기" 레이어가 "상자 헤드"의 일부여야 하므로 함께 사용됩니다.
+        ROIHeads의 새 하위 클래스에는 "상자 예측기"가 필요하지 않습니다.
+        '''
         box_head = build_box_head(
             cfg, ShapeSpec(channels=in_channels, height=pooler_resolution, width=pooler_resolution)
         )
@@ -698,6 +783,7 @@ class StandardROIHeads(ROIHeads):
         # fmt: on
 
         in_channels = [input_shape[f].channels for f in in_features][0]
+        # in_channels = input_shape[f].channels[0]인 것과 같다
 
         ret = {"keypoint_in_features": in_features}
         ret["keypoint_pooler"] = (
@@ -723,23 +809,27 @@ class StandardROIHeads(ROIHeads):
         self,
         images: ImageList,
         features: Dict[str, torch.Tensor],
-        proposals: List[Instances],
-        targets: Optional[List[Instances]] = None,
+        proposals: List[Instances], # Region proposals (위치)?
+        targets: Optional[List[Instances]] = None, # 목표 위치?
     ) -> Tuple[List[Instances], Dict[str, torch.Tensor]]:
         """
         See :class:`ROIHeads.forward`.
         """
-        del images
+        del images # images 삭제
         if self.training:
-            assert targets, "'targets' argument is required during training"
+            assert targets, "'targets' argument is required during training" # 훈련하는 동안 'targets' 인수가 필요합니다.
             proposals = self.label_and_sample_proposals(proposals, targets)
-        del targets
+        del targets # targets 삭제
 
         if self.training:
             losses = self._forward_box(features, proposals)
             # Usually the original proposals used by the box head are used by the mask, keypoint
             # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
             # predicted by the box head.
+            '''
+            일반적으로 상자 헤드에서 사용하는 원래 제안은 마스크, 키포인트 헤드에서 사용됩니다. 
+            그러나 `self.train_on_pred_boxes가 True`이면 제안에는 상자 헤드에서 예측한 상자가 포함됩니다.
+            '''
             losses.update(self._forward_mask(features, proposals))
             losses.update(self._forward_keypoint(features, proposals))
             return proposals, losses
@@ -747,6 +837,9 @@ class StandardROIHeads(ROIHeads):
             pred_instances = self._forward_box(features, proposals)
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
+            '''
+            추론 중에는 계단식 예측이 사용됩니다. 마스크 및 키포인트 헤드는 최고 점수 상자 감지에만 적용됩니다.
+            '''
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
             return pred_instances, {}
 
@@ -759,16 +852,21 @@ class StandardROIHeads(ROIHeads):
         This is useful for downstream tasks where a box is known, but need to obtain
         other attributes (outputs of other heads).
         Test-time augmentation also uses this.
-
+        ##
+        '인스턴스'에서 주어진 상자를 사용하여 ROI당 다른(상자가 아닌) 출력을 생성합니다.
+        
+        이것은 상자가 알려져 있지만 다른 속성(다른 헤드의 출력)을 가져와야 하는 다운스트림 작업에 유용합니다.
+        테스트 시간 증강도 이것을 사용합니다.
         Args:
             features: same as in `forward()`
             instances (list[Instances]): instances to predict other outputs. Expect the keys
                 "pred_boxes" and "pred_classes" to exist.
+            ##
+            features: 'forward()'와 동일
+            instances (list[Instances]): 다른 출력을 예측하는 인스턴스. "pred_boxes" 및 "pred_classes" 키가 있어야 합니다.
 
         Returns:
-            list[Instances]:
-                the same `Instances` objects, with extra
-                fields such as `pred_masks` or `pred_keypoints`.
+            list[Instances]: `pred_masks` 또는 `pred_keypoints`와 같은 추가 필드가 있는 동일한 `Instances` 객체.
         """
         assert not self.training
         assert instances[0].has("pred_boxes") and instances[0].has("pred_classes")
@@ -781,6 +879,9 @@ class StandardROIHeads(ROIHeads):
         """
         Forward logic of the box prediction branch. If `self.train_on_pred_boxes is True`,
             the function puts predicted boxes in the `proposal_boxes` field of `proposals` argument.
+        ##
+        상자 예측 분기의 순방향 논리입니다.
+        `self.train_on_pred_boxes가 True`이면 함수는 예측된 상자를 `proposals` 인수의 `proposal_boxes` 필드에 넣습니다.   
 
         Args:
             features (dict[str, Tensor]): mapping from feature map names to tensor.
@@ -795,13 +896,14 @@ class StandardROIHeads(ROIHeads):
             In inference, a list of `Instances`, the predicted instances.
         """
         features = [features[f] for f in self.box_in_features]
-        box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+        box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals]) # proposals.proposal_boxes와 features를 병합
+        #self.box_pooler : 모양의 텐서(M, C, output_size, output_size) 여기서 M은 모든 N 배치 이미지에 대해 집계된 총 상자 수이고 C는 'x'의 채널 수입니다.
         box_features = self.box_head(box_features)
-        predictions = self.box_predictor(box_features)
-        del box_features
+        predictions = self.box_predictor(box_features) # 예측 결과
+        del box_features # 초기화
 
         if self.training:
-            losses = self.box_predictor.losses(predictions, proposals)
+            losses = self.box_predictor.losses(predictions, proposals) # 제안된 것과 예측 결과 비교 후 loss
             # proposals is modified in-place below, so losses must be computed first.
             if self.train_on_pred_boxes:
                 with torch.no_grad():
@@ -809,7 +911,7 @@ class StandardROIHeads(ROIHeads):
                         predictions, proposals
                     )
                     for proposals_per_image, pred_boxes_per_image in zip(proposals, pred_boxes):
-                        proposals_per_image.proposal_boxes = Boxes(pred_boxes_per_image)
+                        proposals_per_image.proposal_boxes = Boxes(pred_boxes_per_image) 
             return losses
         else:
             pred_instances, _ = self.box_predictor.inference(predictions, proposals)
@@ -818,6 +920,8 @@ class StandardROIHeads(ROIHeads):
     def _forward_mask(self, features: Dict[str, torch.Tensor], instances: List[Instances]):
         """
         Forward logic of the mask prediction branch.
+        ##
+        마스크 예측 분기의 순방향 논리입니다.
 
         Args:
             features (dict[str, Tensor]): mapping from feature map names to tensor.
@@ -835,14 +939,17 @@ class StandardROIHeads(ROIHeads):
 
         if self.training:
             # head is only trained on positive proposals.
-            instances, _ = select_foreground_proposals(instances, self.num_classes)
+            # head는 긍정적인 제안에 대해서만 훈련됩니다.
+            instances, _ = select_foreground_proposals(instances, self.num_classes) # 긍정적인 제안 선택
 
+        # mask poolear가 있으면 사용
         if self.mask_pooler is not None:
             features = [features[f] for f in self.mask_in_features]
             boxes = [x.proposal_boxes if self.training else x.pred_boxes for x in instances]
             features = self.mask_pooler(features, boxes)
         else:
             features = {f: features[f] for f in self.mask_in_features}
+        # mask head를 반환
         return self.mask_head(features, instances)
 
     def _forward_keypoint(self, features: Dict[str, torch.Tensor], instances: List[Instances]):

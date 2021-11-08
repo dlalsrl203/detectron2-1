@@ -113,6 +113,8 @@ class FastRCNNConvFCHead(nn.Sequential):
 def build_box_head(cfg, input_shape):
     """
     Build a box head defined by `cfg.MODEL.ROI_BOX_HEAD.NAME`.
+    ##
+    `cfg.MODEL.ROI_BOX_HEAD.NAME`으로 정의된 박스 헤드를 빌드합니다.
     """
     name = cfg.MODEL.ROI_BOX_HEAD.NAME
     return ROI_BOX_HEAD_REGISTRY.get(name)(cfg, input_shape)

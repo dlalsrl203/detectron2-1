@@ -336,6 +336,9 @@ def pairwise_iou(boxes1: Boxes, boxes2: Boxes) -> torch.Tensor:
     Given two lists of boxes of size N and M, compute the IoU
     (intersection over union) between **all** N x M pairs of boxes.
     The box order must be (xmin, ymin, xmax, ymax).
+    ##
+    크기가 N과 M인 상자의 두 목록이 주어지면 **모든** N x M 상자 쌍 간의 IoU(교집합 이상)를 계산합니다.
+    상자 순서는 (xmin, ymin, xmax, ymax)여야 합니다.
 
     Args:
         boxes1,boxes2 (Boxes): two `Boxes`. Contains N & M boxes, respectively.

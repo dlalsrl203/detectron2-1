@@ -96,12 +96,15 @@ class ImageList(object):
 
         if len(tensors) == 1:
             # This seems slightly (2%) faster.
+            # 이것은 약간(2%) 더 빠른 것 같습니다.
             # TODO: check whether it's faster for multiple images as well
+            # zero padding
             image_size = image_sizes[0]
             padding_size = [0, max_size[-1] - image_size[1], 0, max_size[-2] - image_size[0]]
             batched_imgs = F.pad(tensors[0], padding_size, value=pad_value).unsqueeze_(0)
         else:
             # max_size can be a tensor in tracing mode, therefore convert to list
+            # max_size는 추적 모드에서 텐서가 될 수 있으므로 목록으로 변환
             batch_shape = [len(tensors)] + list(tensors[0].shape[:-2]) + list(max_size)
             batched_imgs = tensors[0].new_full(batch_shape, pad_value)
             for img, pad_img in zip(tensors, batched_imgs):

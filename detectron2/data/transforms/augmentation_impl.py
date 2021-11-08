@@ -39,7 +39,8 @@ __all__ = [
     "RandomCrop_CategoryAreaConstraint",
 ]
 
-
+# data Augmentation class들
+# Random Apply
 class RandomApply(Augmentation):
     """
     Randomly apply an augmentation with a given probability.
@@ -74,6 +75,7 @@ class RandomApply(Augmentation):
             return NoOpTransform()
 
 
+# Random Flip
 class RandomFlip(Augmentation):
     """
     Flip the image horizontally or vertically with the given probability.
@@ -106,6 +108,7 @@ class RandomFlip(Augmentation):
             return NoOpTransform()
 
 
+# Resize
 class Resize(Augmentation):
     """Resize image to a fixed target size"""
 
@@ -132,6 +135,10 @@ class ResizeShortestEdge(Augmentation):
     It attempts to scale the shorter edge to the given `short_edge_length`,
     as long as the longer edge does not exceed `max_size`.
     If `max_size` is reached, then downscale so that the longer edge does not exceed max_size.
+    ##
+    종횡비를 변경하지 않고 이미지 크기를 조정합니다.
+    더 긴 가장자리가 `max_size`를 초과하지 않는 한 더 짧은 가장자리를 주어진 `short_edge_length`로 확장하려고 시도합니다.
+    'max_size'에 도달하면 더 긴 가장자리가 max_size를 초과하지 않도록 축소합니다.
     """
 
     @torch.jit.unused
@@ -143,8 +150,15 @@ class ResizeShortestEdge(Augmentation):
             short_edge_length (list[int]): If ``sample_style=="range"``,
                 a [min, max] interval from which to sample the shortest edge length.
                 If ``sample_style=="choice"``, a list of shortest edge lengths to sample from.
+            ##
+                ``sample_style=="range"``인 경우 가장 짧은 가장자리 길이를 샘플링할 [최소, 최대] 간격입니다.
+                ``sample_style=="choice"``인 경우 샘플링할 가장 짧은 가장자리 길이 목록입니다.
             max_size (int): maximum allowed longest edge length.
+            ##
+                최대 허용되는 가장 긴 가장자리 길이.
             sample_style (str): either "range" or "choice".
+            ##     
+                "범위" 또는 "선택" 중 하나입니다.
         """
         super().__init__()
         assert sample_style in ["range", "choice"], sample_style
@@ -154,6 +168,7 @@ class ResizeShortestEdge(Augmentation):
             short_edge_length = (short_edge_length, short_edge_length)
         if self.is_range:
             assert len(short_edge_length) == 2, (
+                # "short_edge_length는 '범위' 샘플 스타일을 사용하는 두 개의 값이어야 합니다.
                 "short_edge_length must be two values using 'range' sample style."
                 f" Got {short_edge_length}!"
             )
@@ -178,6 +193,8 @@ class ResizeShortestEdge(Augmentation):
     ) -> Tuple[int, int]:
         """
         Compute the output size given input size and target short edge length.
+        ##
+        입력 크기와 대상 짧은 가장자리 길이가 주어진 출력 크기를 계산합니다.
         """
         h, w = oldh, oldw
         size = short_edge_length * 1.0
@@ -190,6 +207,8 @@ class ResizeShortestEdge(Augmentation):
             scale = max_size * 1.0 / max(newh, neww)
             newh = newh * scale
             neww = neww * scale
+
+        # 
         neww = int(neww + 0.5)
         newh = int(newh + 0.5)
         return (newh, neww)

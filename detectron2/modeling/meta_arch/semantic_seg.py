@@ -140,6 +140,10 @@ class SemSegFPNHead(nn.Module):
     3x3 convs and upsampling to scale all of them to the stride defined by
     ``common_stride``. Then these features are added and used to make final
     predictions by another 1x1 conv layer.
+    ##
+    :paper:`PanopticFPN`에 설명된 시맨틱 분할 헤드.
+    FPN features 목록을 입력으로 사용하고 3x3 전환 및 업샘플링 시퀀스를 적용하여 모든 항목을 ``common_stride``로 정의된 보폭으로 확장합니다.
+    그런 다음 이러한 features가 추가되어 다른 1x1 변환 레이어에서 최종 예측을 수행하는 데 사용됩니다.
     """
 
     @configurable
@@ -165,47 +169,70 @@ class SemSegFPNHead(nn.Module):
             loss_weight: loss weight
             norm (str or callable): normalization for all conv layers
             ignore_value: category id to be ignored during training.
+            ##
+            input_shape: 입력 features의 모양(채널 및 보폭)
+            num_classes: 예측할 클래스 수
+            conv_dims: 중간 변환 레이어의 출력 채널 수입니다.
+            common_stride: 모든 features이 다음으로 업그레이드될 것이라는 공통된 진전
+            loss_weight: loss weight
+            norm (str or callable): 모든 전환 레이어에 대한 정규화
+            ignore_value: 학습 중에 무시할 카테고리 ID입니다.
         """
         super().__init__()
-        input_shape = sorted(input_shape.items(), key=lambda x: x[1].stride)
+        input_shape = sorted(input_shape.items(), key=lambda x: x[1].stride) # stride 순으로 정렬
         if not len(input_shape):
             raise ValueError("SemSegFPNHead(input_shape=) cannot be empty!")
-        self.in_features = [k for k, v in input_shape]
-        feature_strides = [v.stride for k, v in input_shape]
-        feature_channels = [v.channels for k, v in input_shape]
+        self.in_features = [k for k, v in input_shape] # 정렬된 순으로 feature 저장
+        feature_strides = [v.stride for k, v in input_shape] # fzip(["p2", "p3", "p4", "p5"], [4, 8, 16, 32]) // eature의 stride 저장
+        # feature = 0, 1, 2, 3
+        feature_channels = [v.channels for k, v in input_shape] # feature의 channel 저장
 
-        self.ignore_value = ignore_value
-        self.common_stride = common_stride
-        self.loss_weight = loss_weight
+        self.ignore_value = ignore_value # 255 // 학습 중에 무시할 카테고리 ID
+        self.common_stride = common_stride # 4 // 모든 features가 upscale될 기본 stride
+        self.loss_weight = loss_weight # 0.5
 
-        self.scale_heads = []
+        self.scale_heads = [] # feature의 크기와 채널을 변경시키는 head
         for in_feature, stride, channels in zip(
             self.in_features, feature_strides, feature_channels
         ):
-            head_ops = []
+            head_ops = [] # Convolution + Nomalize + Upsample 3개 묶음
             head_length = max(1, int(np.log2(stride) - np.log2(self.common_stride)))
             for k in range(head_length):
                 norm_module = get_norm(norm, conv_dims)
-                conv = Conv2d(
+                # convolution layer 생성.
+                conv = Conv2d( 
                     channels if k == 0 else conv_dims,
                     conv_dims,
-                    kernel_size=3,
+                    kernel_size=3, # 3x3
                     stride=1,
                     padding=1,
                     bias=not norm,
-                    norm=norm_module,
+                    norm=norm_module, # Nomalize 추가
                     activation=F.relu,
                 )
-                weight_init.c2_msra_fill(conv)
-                head_ops.append(conv)
-                if stride != self.common_stride:
+                weight_init.c2_msra_fill(conv) # Caffe2에 구현된 "MSRAFill"을 사용하여 `module.weight`를 초기화합니다.   
+                                               # 또한 `module.bias`를 0으로 초기화합니다.
+                head_ops.append(conv) # 생성한 conv 추가
+                if stride != self.common_stride: # p2가 아니면이라는 건가?
                     head_ops.append(
                         nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
-                    )
-            self.scale_heads.append(nn.Sequential(*head_ops))
-            self.add_module(in_feature, self.scale_heads[-1])
-        self.predictor = Conv2d(conv_dims, num_classes, kernel_size=1, stride=1, padding=0)
-        weight_init.c2_msra_fill(self.predictor)
+                    ) # upsample 추가
+                    '''
+                        nn.Upsample(size, scale_factor, mode, align_corners)
+                            size = 출력 공간 크기
+                            scale_factor = 공간 크기에 대한 승수. 튜플인 경우 입력 크기와 일치해야 합니다.
+                            mode = 업샘플링 알고리즘(보간법): 'nearest' , 'linear' , 'bilinear' , 'bicubic' 및 'trilinear' 중 하나입니다. 기본값: 'nearest'
+                            align_corners = True 이면 입력 및 출력 텐서의 모서리 픽셀이 정렬되어 해당 픽셀의 값을 유지합니다.
+                                             mode 가 'linear' , 'bilinear' 또는 'trilinear' 인 경우에만 효과가 있습니다 . 기본값 : False
+                    '''
+            self.scale_heads.append(nn.Sequential(*head_ops)) # nn.Sequential 신경망 생성 https://dororongju.tistory.com/147
+            self.add_module(in_feature, self.scale_heads[-1]) # scale_heads에 추가된 제일 마지막 걸 추가
+        self.predictor = Conv2d(conv_dims, num_classes, kernel_size=1, stride=1, padding=0) # 마지막 예측층
+        '''
+        conv_dims = 4
+        num_classes = 54
+        '''
+        weight_init.c2_msra_fill(self.predictor) # Caffe2에 구현된 "MSRAFill"을 사용하여 `module.weight`를 초기화합니다.  
 
     @classmethod
     def from_config(cls, cfg, input_shape: Dict[str, ShapeSpec]):

@@ -96,12 +96,16 @@ class BasicBlock(CNNBlockBase):
         out = F.relu_(out)
         return out
 
-
+# conv2 ~ conv5
+# 101 : [3, 4, 23, 3]
 class BottleneckBlock(CNNBlockBase):
     """
     The standard bottleneck residual block used by ResNet-50, 101 and 152
     defined in :paper:`ResNet`.  It contains 3 conv layers with kernels
     1x1, 3x3, 1x1, and a projection shortcut if needed.
+    ##
+    :paper:`ResNet`에 정의된 ResNet-50, 101 및 152에서 사용하는 표준 병목 잔류 블록입니다.
+    커널 1x1, 3x3, 1x1 및 필요한 경우 투영 바로 가기가 있는 3개의 변환 레이어가 포함되어 있습니다.
     """
 
     def __init__(
@@ -120,16 +124,33 @@ class BottleneckBlock(CNNBlockBase):
         Args:
             bottleneck_channels (int): number of output channels for the 3x3
                 "bottleneck" conv layers.
+                ##
+                3x3 "병목" 전환 레이어의 출력 채널 수입니다.
+
             num_groups (int): number of groups for the 3x3 conv layer.
+                              ##
+                              3x3 전환 레이어의 그룹 수입니다.
+
             norm (str or callable): normalization for all conv layers.
                 See :func:`layers.get_norm` for supported format.
+                ##
+                모든 전환 레이어에 대한 정규화
+                지원되는 형식은 :func:`layers.get_norm`을 참조하세요.
+
             stride_in_1x1 (bool): when stride>1, whether to put stride in the
                 first 1x1 convolution or the bottleneck 3x3 convolution.
+                ##
+                stride>1일 때 첫 번째 1x1 컨볼루션 또는 병목 현상 3x3 컨볼루션에 stride를 넣을지 여부입니다.
+
             dilation (int): the dilation rate of the 3x3 conv layer.
+                            ##
+                            3x3 conv 층의 팽창률.
         """
         super().__init__(in_channels, out_channels, stride)
 
         if in_channels != out_channels:
+            # shortcut
+            # 1x1
             self.shortcut = Conv2d(
                 in_channels,
                 out_channels,
@@ -144,8 +165,13 @@ class BottleneckBlock(CNNBlockBase):
         # The original MSRA ResNet models have stride in the first 1x1 conv
         # The subsequent fb.torch.resnet and Caffe2 ResNe[X]t implementations have
         # stride in the 3x3 conv
+        '''
+        원래 MSRA ResNet 모델은 첫 번째 1x1 전환에서 보폭을 보였습니다.
+        후속 fb.pytorch.resnet 및 Caffe2 ResNet[X]t 구현은 3x3 전환에서 보폭을 보였습니다.
+        '''
         stride_1x1, stride_3x3 = (stride, 1) if stride_in_1x1 else (1, stride)
 
+        # 1x1 
         self.conv1 = Conv2d(
             in_channels,
             bottleneck_channels,
@@ -154,7 +180,7 @@ class BottleneckBlock(CNNBlockBase):
             bias=False,
             norm=get_norm(norm, bottleneck_channels),
         )
-
+        # 3x3
         self.conv2 = Conv2d(
             bottleneck_channels,
             bottleneck_channels,
@@ -166,7 +192,7 @@ class BottleneckBlock(CNNBlockBase):
             dilation=dilation,
             norm=get_norm(norm, bottleneck_channels),
         )
-
+        # 1x1
         self.conv3 = Conv2d(
             bottleneck_channels,
             out_channels,
@@ -182,21 +208,35 @@ class BottleneckBlock(CNNBlockBase):
         # Zero-initialize the last normalization in each residual branch,
         # so that at the beginning, the residual branch starts with zeros,
         # and each residual block behaves like an identity.
+        '''
+        각 잔차 분기의 마지막 정규화를 0으로 초기화하여 처음에 잔차 분기가 0으로 시작하고
+        각 잔차 블록이 ID처럼 작동하도록 합니다.
+        '''
         # See Sec 5.1 in "Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour":
         # "For BN layers, the learnable scaling coefficient γ is initialized
         # to be 1, except for each residual block's last BN
         # where γ is initialized to be 0."
+        '''
+        "정확한 대형 Minibatch SGD: 1시간 동안 ImageNet 교육"의 섹션 5.1 
+        참조: "BN 레이어의 경우 학습 가능한 스케일링 계수 γ는 γ가 0으로 초기화되는
+        각 잔여 블록의 마지막 BN을 제외하고 1로 초기화됩니다."
+        '''
 
         # nn.init.constant_(self.conv3.norm.weight, 0)
         # TODO this somehow hurts performance when training GN models from scratch.
         # Add it as an option when we need to use this code to train a backbone.
+        '''
+        nn.init.constant_(self.conv3.norm.weight, 0)
+        TODO 이것은 처음부터 GN 모델을 훈련할 때 성능을 저하시킵니다. 
+        백본을 훈련하기 위해 이 코드를 사용해야 할 때 옵션으로 추가하십시오.
+        '''
 
     def forward(self, x):
         out = self.conv1(x)
-        out = F.relu_(out)
+        out = F.relu_(out) # ReLU
 
         out = self.conv2(out)
-        out = F.relu_(out)
+        out = F.relu_(out) # ReLU
 
         out = self.conv3(out)
 
@@ -206,7 +246,7 @@ class BottleneckBlock(CNNBlockBase):
             shortcut = x
 
         out += shortcut
-        out = F.relu_(out)
+        out = F.relu_(out) # ReLU
         return out
 
 
@@ -326,36 +366,43 @@ class DeformBottleneckBlock(CNNBlockBase):
         out = F.relu_(out)
         return out
 
-
+# Resnet Convolution Layer 1 
 class BasicStem(CNNBlockBase):
     """
     The standard ResNet stem (layers before the first residual block),
     with a conv, relu and max_pool.
+    ##
+    conv, relu 및 max_pool이 있는 표준 ResNet 시스템(첫 번째 residual block 이전의 레이어).
     """
 
     def __init__(self, in_channels=3, out_channels=64, norm="BN"):
         """
         Args:
             norm (str or callable): norm after the first conv layer.
+                                    첫 번째 전환 레이어 이후의 표준
                 See :func:`layers.get_norm` for supported format.
+                    지원되는 형식에 대한 func:`layers.get_norm`
+                BN = Batch Normalization
         """
         super().__init__(in_channels, out_channels, 4)
         self.in_channels = in_channels
         self.conv1 = Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=7,
-            stride=2,
-            padding=3,
-            bias=False,
+            in_channels,    # 3 RGB
+            out_channels,   # 64
+            kernel_size=7,  # 7x7
+            stride=2,       # 2
+            padding=3,      # 3
+            bias=False,     # 추가 값 (f(x) = wx + b) b : 바이어스
             norm=get_norm(norm, out_channels),
         )
+        # output size = 112x112
         weight_init.c2_msra_fill(self.conv1)
 
+# Resnet Convolution Layer1 Pooling
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu_(x)
-        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
+        x = self.conv1(x) # f(x)
+        x = F.relu_(x) # ReLU
+        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1) # max pooling
         return x
 
 
@@ -565,6 +612,10 @@ class ResNet(Backbone):
             list[list[CNNBlockBase]]: modules in all stages; see arguments of
                 :class:`ResNet.__init__`.
         """
+        # Convolution Layer 갯수 
+        # ex) 101 : conv2 = 3 * 3 conv3 = 3 * 4 conv4 = 3 * 23 conv5 3 * 3 
+        # conv2 + conv3 + conv4 + conv5 = 99
+        # 99 + 2 = 101 
         num_blocks_per_stage = {
             18: [2, 2, 2, 2],
             34: [3, 4, 6, 3],

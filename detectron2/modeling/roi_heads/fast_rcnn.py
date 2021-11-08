@@ -185,6 +185,11 @@ class FastRCNNOutputLayers(nn.Module):
 
     1. proposal-to-detection box regression deltas
     2. classification scores
+    ##
+    Fast R-CNN 출력을 예측하기 위한 두 개의 선형 레이어:
+
+    1. 제안-검출 상자 회귀 델타
+    2. 분류 점수
     """
 
     @configurable

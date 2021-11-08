@@ -70,6 +70,10 @@ class StandardRPNHead(nn.Module):
     Uses a 3x3 conv to produce a shared hidden state from which one 1x1 conv predicts
     objectness logits for each anchor and a second 1x1 conv predicts bounding-box deltas
     specifying how to deform each anchor into an object proposal.
+    ##
+    :paper:`Faster R-CNN`에 설명된 표준 RPN 분류 및 회귀 헤드.
+    3x3 conv을 사용하여 하나의 1x1 conv이 각 앵커(anchor)에 대한 객체성 로짓(classification)을 예측하고 두 번째 1x1 conv이 각 anchor를 객체 제안으로 
+    변형하는 방법을 지정하는 bounding-box 델타를 예측하는 공유 hidden state를 생성합니다.
     """
 
     @configurable
@@ -82,27 +86,49 @@ class StandardRPNHead(nn.Module):
         Args:
             in_channels (int): number of input feature channels. When using multiple
                 input features, they must have the same number of channels.
+                ##
+                input feature 채널의 수. 다중 input feature을 사용하는 경우 동일한 수의 채널이 있어야 합니다.
+
             num_anchors (int): number of anchors to predict for *each spatial position*
                 on the feature map. The total number of anchors for each
                 feature map will be `num_anchors * H * W`.
+                ##
+                feature map의 *각 공간 위치*에 대해 예측할 앵커 수입니다. 각 feature map의 총 앵커 수는 `num_anchors * H * W`입니다.
+
             box_dim (int): dimension of a box, which is also the number of box regression
                 predictions to make for each anchor. An axis aligned box has
                 box_dim=4, while a rotated box has box_dim=5.
+                ##
+                각 앵커에 대해 수행할 box regression predictions의 수이기도 한 상자의 차원입니다. 축 정렬 상자는 box_dim=4이고 회전된 상자는 box_dim=5입니다.
+
             conv_dims (list[int]): a list of integers representing the output channels
                 of N conv layers. Set it to -1 to use the same number of output channels
                 as input channels.
+                ##
+                N conv 레이어의 출력 채널을 나타내는 정수 목록입니다. 입력 채널과 동일한 수의 출력 채널을 사용하려면 -1로 설정합니다.
         """
         super().__init__()
         cur_channels = in_channels
         # Keeping the old variable names and structure for backwards compatiblity.
+        # 이전 버전과의 호환성을 위해 이전 변수 이름과 구조를 유지합니다.
+
         # Otherwise the old checkpoints will fail to load.
+        # 그렇지 않으면 이전 체크포인트가 로드되지 않습니다.
+        '''
+         conv_dims : N conv 레이어의 출력 채널을 나타내는 정수 목록입니다. 입력 채널과 동일한 수의 출력 채널을 사용하려면 -1로 설정합니다.
+        '''
         if len(conv_dims) == 1:
             out_channels = cur_channels if conv_dims[0] == -1 else conv_dims[0]
             # 3x3 conv for the hidden representation
+            # 은닉 표현을 위한 3x3 전환
             self.conv = self._get_rpn_conv(cur_channels, out_channels)
             cur_channels = out_channels
         else:
             self.conv = nn.Sequential()
+            '''
+            k = 인덱스
+            conv_dim = 값
+            '''
             for k, conv_dim in enumerate(conv_dims):
                 out_channels = cur_channels if conv_dim == -1 else conv_dim
                 if out_channels <= 0:
@@ -112,12 +138,25 @@ class StandardRPNHead(nn.Module):
                 conv = self._get_rpn_conv(cur_channels, out_channels)
                 self.conv.add_module(f"conv{k}", conv)
                 cur_channels = out_channels
+        '''
         # 1x1 conv for predicting objectness logits
+        # 객관성 로짓 예측을 위한 1x1 전환
+
+        cur_channels = out_channels
+        num_anchors : feature map의 *각 공간 위치*에 대해 예측할 앵커 수입니다. 각 feature map의 총 앵커 수는 `num_anchors * H * W`입니다.
+        '''
         self.objectness_logits = nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1)
+        
+        '''
         # 1x1 conv for predicting box2box transform deltas
+        # box2box 변환 델타 예측을 위한 1x1 전환
+        Box_dim : 각 앵커에 대해 수행할 box regression predictions의 수이기도 한 상자의 차원입니다. 축 정렬 상자는 box_dim=4이고 회전된 상자는 box_dim=5입니다.
+
+        '''
         self.anchor_deltas = nn.Conv2d(cur_channels, num_anchors * box_dim, kernel_size=1, stride=1)
 
         # Keeping the order of weights initialization same for backwards compatiblility.
+        # 이전 버전과의 호환성을 위해 가중치 초기화 순서를 동일하게 유지합니다.
         for layer in self.modules():
             if isinstance(layer, nn.Conv2d):
                 nn.init.normal_(layer.weight, std=0.01)
@@ -136,12 +175,15 @@ class StandardRPNHead(nn.Module):
     @classmethod
     def from_config(cls, cfg, input_shape):
         # Standard RPN is shared across levels:
+        # 표준 RPN은 다음 수준에서 공유됩니다.
         in_channels = [s.channels for s in input_shape]
         assert len(set(in_channels)) == 1, "Each level must have the same channel!"
         in_channels = in_channels[0]
 
         # RPNHead should take the same input as anchor generator
+        # RPNHead는 앵커 생성기와 동일한 입력을 받아야 합니다.
         # NOTE: it assumes that creating an anchor generator does not have unwanted side effect.
+        # 앵커 생성기를 생성하면 원치 않는 부작용이 없다고 가정합니다.
         anchor_generator = build_anchor_generator(cfg, input_shape)
         num_anchors = anchor_generator.num_anchors
         box_dim = anchor_generator.box_dim
@@ -161,12 +203,20 @@ class StandardRPNHead(nn.Module):
             features (list[Tensor]): list of feature maps
 
         Returns:
-            list[Tensor]: A list of L elements.
+            pred_objectness_logits : list[Tensor]
+                : A list of L elements.
                 Element i is a tensor of shape (N, A, Hi, Wi) representing
                 the predicted objectness logits for all anchors. A is the number of cell anchors.
-            list[Tensor]: A list of L elements. Element i is a tensor of shape
+                ##
+                L 요소의 리스트입니다.
+                요소 i는 모든 앵커에 대해 예측된 객체성 로짓을 나타내는 모양(N, A, Hi, Wi)의 텐서입니다. A는 셀 앵커의 수입니다.
+            pred_anchor_deltas : list[Tensor]
+                : A list of L elements. Element i is a tensor of shape
                 (N, A*box_dim, Hi, Wi) representing the predicted "deltas" used to transform anchors
                 to proposals.
+                ##
+                L 요소의 리스트입니다. 
+                요소 i는 앵커를 proposals으로 변환하는 데 사용되는 예측된 "델타"를 나타내는 shape(N, A*box_dim, Hi, Wi)의 텐서입니다.
         """
         pred_objectness_logits = []
         pred_anchor_deltas = []
@@ -176,11 +226,12 @@ class StandardRPNHead(nn.Module):
             pred_anchor_deltas.append(self.anchor_deltas(t))
         return pred_objectness_logits, pred_anchor_deltas
 
-
 @PROPOSAL_GENERATOR_REGISTRY.register()
 class RPN(nn.Module):
     """
     Region Proposal Network, introduced by :paper:`Faster R-CNN`.
+    ##
+    :paper:`Faster R-CNN`에서 소개한 지역 제안 네트워크.
     """
 
     @configurable
@@ -234,6 +285,26 @@ class RPN(nn.Module):
             box_reg_loss_type (str): Loss type to use. Supported losses: "smooth_l1", "giou".
             smooth_l1_beta (float): beta parameter for the smooth L1 regression loss. Default to
                 use L1 loss. Only used when `box_reg_loss_type` is "smooth_l1"
+            ##
+            in_features (list[str]): 사용할 입력 feature의 이름 list
+            head (nn.Module): 수준별 기능 목록에서 각 수준에 대한 로짓 및 회귀 델타를 예측하는 모듈
+            anchor_generator (nn.Module): 기능 목록에서 앵커를 생성하는 모듈입니다. 일반적으로 :class:`AnchorGenerator`의 인스턴스
+            anchor_matcher (Matcher): 기준 사실과 일치시켜 앵커에 레이블을 지정합니다.
+            box2box_transform (Box2BoxTransform): 앵커 상자에서 인스턴스 상자로의 변환을 정의합니다.
+            batch_size_per_image (int): 훈련을 위해 샘플링할 이미지당 앵커 수
+            positive_fraction (float): 훈련용 샘플에 대한 전경 앵커의 비율
+            pre_nms_topk (tuple[float]): 훈련 및 테스트에서 NMS 이전에 선택할 상위 k개의 proposals 수를 나타내는 (train, test).
+            post_nms_topk (tuple[float]): 훈련 및 테스트에서 NMS 이후에 선택할 상위 k개 proposals의 수를 나타내는 (train, test).
+            nms_thresh (float): 예측 proposals의 중복을 제거하는 데 사용되는 NMS 임계값
+            min_box_size (float): 입력 이미지 픽셀 단위로 이 임계값보다 작은 측면이 있는 proposals box를 제거합니다.
+            anchor_boundary_thresh (float): legacy option
+            loss_weight (float|dict): loss에 사용할 가중치. 모든 rpn loss을 함께 가중하기 위한 단일 부동 소수점 또는 개별 가중치의 dict일 수 있습니다.
+                유효한 사전 키는 다음과 같습니다.
+                    "loss_rpn_cls" - 분류 loss에 적용됨
+                    "loss_rpn_loc" - 상자 회귀 loss에 적용됨
+            box_reg_loss_type (str): 사용할 loss 유형입니다. 지원되는 손실: "smooth_l1", "giou".
+            smooth_l1_beta (float): 부드러운 L1 회귀 loss에 대한 베타 매개변수. 기본적으로 L1 loss를 사용합니다.
+                `box_reg_loss_type`이 "smooth_l1"인 경우에만 사용됩니다.
         """
         super().__init__()
         self.in_features = in_features

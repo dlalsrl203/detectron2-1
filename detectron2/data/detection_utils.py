@@ -57,9 +57,12 @@ _M_YUV2RGB = [[1.0, 0.0, 1.13983], [1.0, -0.39465, -0.58060], [1.0, 2.03211, 0.0
 _EXIF_ORIENT = 274  # exif 'Orientation' tag
 
 
+# Python Image List를 numpy로 변환
 def convert_PIL_to_numpy(image, format):
     """
     Convert PIL image to numpy array of target format.
+    ##
+    PIL 이미지를 대상 형식의 numpy 배열로 변환합니다.
 
     Args:
         image (PIL.Image): a PIL image
@@ -70,18 +73,22 @@ def convert_PIL_to_numpy(image, format):
     """
     if format is not None:
         # PIL only supports RGB, so convert to RGB and flip channels over below
+        # PIL은 RGB만 지원하므로 RGB로 변환하고 아래 채널을 뒤집습니다.
         conversion_format = format
         if format in ["BGR", "YUV-BT.601"]:
             conversion_format = "RGB"
         image = image.convert(conversion_format)
     image = np.asarray(image)
     # PIL squeezes out the channel dimension for "L", so make it HWC
+    # PIL은 "L"에 대한 채널 치수를 짜내므로 HWC로 만듭니다.
     if format == "L":
         image = np.expand_dims(image, -1)
 
     # handle formats not supported by PIL
+    # PIL에서 지원하지 않는 핸들 형식
     elif format == "BGR":
         # flip channels if needed
+        # 필요한 경우 채널을 뒤집습니다.
         image = image[:, :, ::-1]
     elif format == "YUV-BT.601":
         image = image / 255.0
@@ -90,6 +97,7 @@ def convert_PIL_to_numpy(image, format):
     return image
 
 
+# Image를 RGB 변환
 def convert_image_to_rgb(image, format):
     """
     Convert an image from given format to RGB.
@@ -162,7 +170,7 @@ def _apply_exif_orientation(image):
         return image.transpose(method)
     return image
 
-
+# 이미지 읽기
 def read_image(file_name, format=None):
     """
     Read an image into the given format.
@@ -182,9 +190,9 @@ def read_image(file_name, format=None):
 
         # work around this bug: https://github.com/python-pillow/Pillow/issues/3973
         image = _apply_exif_orientation(image)
-        return convert_PIL_to_numpy(image, format)
+        return convert_PIL_to_numpy(image, format) # 2. convert
 
-
+# 이미지 사이즈 체크
 def check_image_size(dataset_dict, image):
     """
     Raise an error if the image does not match the size specified in the dict.
@@ -210,7 +218,8 @@ def check_image_size(dataset_dict, image):
     if "height" not in dataset_dict:
         dataset_dict["height"] = image.shape[0]
 
-
+# 이미지 resizing
+# transform 요청
 def transform_proposals(dataset_dict, image_shape, transforms, *, proposal_topk, min_box_size=0):
     """
     Apply transformations to the proposals in dataset_dict, if any.
@@ -589,7 +598,7 @@ def check_metadata_consistency(key, dataset_names):
             )
             raise ValueError("Datasets have different metadata '{}'!".format(key))
 
-
+# config로 Augmentation class list를 만든다.
 def build_augmentation(cfg, is_train):
     """
     Create a list of default :class:`Augmentation` from config.

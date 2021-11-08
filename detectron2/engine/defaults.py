@@ -248,17 +248,28 @@ def default_writers(output_dir: str, max_iter: Optional[int] = None):
     ]
 
 
-class DefaultPredictor:
+class  DefaultPredictor:
     """
     Create a simple end-to-end predictor with the given config that runs on
     single device for a single input image.
+    ## 
+    단일 입력 이미지에 대해 단일 장치에서 실행되는 지정된 구성으로 간단한 종단 간 예측기를 만듭니다.
 
     Compared to using the model directly, this class does the following additions:
-
+    ##
+    모델을 직접 사용하는 것과 비교하여 이 클래스는 다음과 같은 추가 작업을 수행합니다.
+    
     1. Load checkpoint from `cfg.MODEL.WEIGHTS`.
+    `cfg.MODEL.WEIGHTS`에서 체크포인트를 로드합니다.
+
     2. Always take BGR image as the input and apply conversion defined by `cfg.INPUT.FORMAT`.
+    항상 BGR 이미지를 입력으로 받아 `cfg.INPUT.FORMAT`에 정의된 변환을 적용하십시오.
+    
     3. Apply resizing defined by `cfg.INPUT.{MIN,MAX}_SIZE_TEST`.
+    `cfg.INPUT.{MIN,MAX}_SIZE_TEST`로 정의된 크기 조정을 적용합니다.
+    
     4. Take one input image and produce a single output, instead of a batch.
+    배치 대신 하나의 입력 이미지를 가져와 단일 출력을 생성합니다.
 
     This is meant for simple demo purposes, so it does the above steps automatically.
     This is not meant for benchmarks or running complicated inference logic.
@@ -277,19 +288,26 @@ class DefaultPredictor:
     """
 
     def __init__(self, cfg):
-        self.cfg = cfg.clone()  # cfg can be modified by model
+        # cfg can be modified by model
+        # cfg는 모델별로 수정할 수 있습니다.
+        self.cfg = cfg.clone()  
+
+        # cfg를 바탕으로 모델 생성
         self.model = build_model(self.cfg)
+        # eval() : 매개번수로 받은 expression(식)을 문자열로 받아서 실행시키는 함수
         self.model.eval()
+        # 데이터 셋이 있다면
         if len(cfg.DATASETS.TEST):
             self.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
 
         checkpointer = DetectionCheckpointer(self.model)
         checkpointer.load(cfg.MODEL.WEIGHTS)
 
+        # resize
         self.aug = T.ResizeShortestEdge(
             [cfg.INPUT.MIN_SIZE_TEST, cfg.INPUT.MIN_SIZE_TEST], cfg.INPUT.MAX_SIZE_TEST
         )
-
+        # 데이터 셋 포멧 (RGB, BGR)
         self.input_format = cfg.INPUT.FORMAT
         assert self.input_format in ["RGB", "BGR"], self.input_format
 
@@ -592,6 +610,7 @@ Alternatively, you can call evaluation functions yourself (see Colab balloon tut
             data_loader = cls.build_test_loader(cfg, dataset_name)
             # When evaluators are passed in as arguments,
             # implicitly assume that evaluators can be created before data_loader.
+            # 평가자가 인수로 전달되면 data_loader 전에 평가자가 생성될 수 있다고 암시적으로 가정합니다.
             if evaluators is not None:
                 evaluator = evaluators[idx]
             else:
@@ -672,7 +691,9 @@ Alternatively, you can call evaluation functions yourself (see Colab balloon tut
             cfg.SOLVER.IMS_PER_BATCH % old_world_size == 0
         ), "Invalid REFERENCE_WORLD_SIZE in config!"
         scale = num_workers / old_world_size
+        # bs : 배치 사이즈
         bs = cfg.SOLVER.IMS_PER_BATCH = int(round(cfg.SOLVER.IMS_PER_BATCH * scale))
+        # LR = Linear Rayout
         lr = cfg.SOLVER.BASE_LR = cfg.SOLVER.BASE_LR * scale
         max_iter = cfg.SOLVER.MAX_ITER = int(round(cfg.SOLVER.MAX_ITER / scale))
         warmup_iter = cfg.SOLVER.WARMUP_ITERS = int(round(cfg.SOLVER.WARMUP_ITERS / scale))
@@ -682,6 +703,7 @@ Alternatively, you can call evaluation functions yourself (see Colab balloon tut
         cfg.SOLVER.REFERENCE_WORLD_SIZE = num_workers  # maintain invariant
         logger = logging.getLogger(__name__)
         logger.info(
+            # 구성을 batch_size={bs}, learning_rate={lr}로 자동 크기 조정,,
             f"Auto-scaling the config to batch_size={bs}, learning_rate={lr}, "
             f"max_iter={max_iter}, warmup={warmup_iter}."
         )
@@ -692,6 +714,7 @@ Alternatively, you can call evaluation functions yourself (see Colab balloon tut
 
 
 # Access basic attributes from the underlying trainer
+# 기본 트레이너의 기본 속성에 액세스
 for _attr in ["model", "data_loader", "optimizer"]:
     setattr(
         DefaultTrainer,

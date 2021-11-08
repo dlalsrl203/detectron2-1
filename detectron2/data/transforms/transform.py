@@ -94,6 +94,8 @@ class ExtentTransform(Transform):
 class ResizeTransform(Transform):
     """
     Resize the image to a target size.
+    ##
+    이미지 크기를 목표 크기로 조정합니다.
     """
 
     def __init__(self, h, w, new_h, new_w, interp=None):
@@ -102,6 +104,10 @@ class ResizeTransform(Transform):
             h, w (int): original image size
             new_h, new_w (int): new image size
             interp: PIL interpolation methods, defaults to bilinear.
+            h, w(int): 원본 이미지 크기
+            new_h, new_w(int): 새 이미지 크기
+            interp: PIL 보간법, 기본값은 bilinear입니다.
+                    nearest, bicubic도 존재
         """
         # TODO decide on PIL vs opencv
         super().__init__()
@@ -119,7 +125,9 @@ class ResizeTransform(Transform):
                 pil_image = Image.fromarray(img[:, :, 0], mode="L")
             else:
                 pil_image = Image.fromarray(img)
+            # 실제 변환하는 곳(Resize)
             pil_image = pil_image.resize((self.new_w, self.new_h), interp_method)
+            
             ret = np.asarray(pil_image)
             if len(img.shape) > 2 and img.shape[2] == 1:
                 ret = np.expand_dims(ret, -1)

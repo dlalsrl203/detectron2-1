@@ -137,15 +137,23 @@ class PanopticFPN(GeneralizedRCNN):
     def inference(self, batched_inputs: List[Dict[str, torch.Tensor]], do_postprocess: bool = True):
         """
         Run inference on the given inputs.
+        ##
+        주어진 입력에 대해 추론을 실행합니다.
 
         Args:
             batched_inputs (list[dict]): same as in :meth:`forward`
             do_postprocess (bool): whether to apply post-processing on the outputs.
+            ##
+            batched_inputs (list[dict]): :meth:`forward`와 동일
+            do_postprocess (bool): 출력에 사후 처리를 적용할지 여부입니다..
 
         Returns:
             When do_postprocess=True, see docs in :meth:`forward`.
             Otherwise, returns a (list[Instances], list[Tensor]) that contains
             the raw detector outputs, and raw semantic segmentation outputs.
+            ##
+            do_postprocess=True인 경우 :meth:`forward`의 문서를 참조하세요.
+            그렇지 않으면 raw detector outputs과 raw semantic segmentation을 포함하는 (list[Instances], list[Tensor])를 반환합니다.
         """
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
@@ -189,16 +197,26 @@ def combine_semantic_and_instance_outputs(
     Implement a simple combining logic following
     "combine_semantic_and_instance_predictions.py" in panopticapi
     to produce panoptic segmentation outputs.
+    ##
+    panopticapi에서 "combine_semantic_and_instance_predictions.py"를 따르는 간단한 결합 논리를 구현하여 판옵틱 분할 출력을 생성합니다.
 
     Args:
         instance_results: output of :func:`detector_postprocess`.
         semantic_results: an (H, W) tensor, each element is the contiguous semantic
             category id
+        ##
+        instance_results: :func:`detector_postprocess`의 출력.
+        semantic_results: (H, W) 텐서, 각 요소는 인접한 의미 범주 id입니다.
+
 
     Returns:
         panoptic_seg (Tensor): of shape (height, width) where the values are ids for each segment.
         segments_info (list[dict]): Describe each segment in `panoptic_seg`.
             Each dict contains keys "id", "category_id", "isthing".
+        ##
+        panoptic_seg (Tensor): 값이 각 세그먼트의 ID인 모양(높이, 너비).
+        segments_info (list[dict]): 'panoptic_seg'에서 각 세그먼트를 설명합니다.
+            각 사전에는 "id", "category_id", "isthing" 키가 포함됩니다.
     """
     panoptic_seg = torch.zeros_like(semantic_results, dtype=torch.int32)
 
